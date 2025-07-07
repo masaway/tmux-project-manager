@@ -1,0 +1,99 @@
+{
+  "projects": [
+    {
+      "name": "tmux-config",
+      "path": "/home/yoshiaki/work/tmux-config",
+      "enabled": true,
+      "description": "tmux設定ファイル管理",
+      "type": "config",
+      "commands": {
+        "startup": "pwd && ls -la",
+        "dev": null
+      }
+    },
+    {
+      "name": "goshugi",
+      "path": "/home/yoshiaki/work/goshugi",
+      "enabled": true,
+      "description": "ご祝儀管理システム",
+      "type": "planning",
+      "commands": {
+        "startup": "pwd && ls -la",
+        "dev": null
+      }
+    },
+    {
+      "name": "heartfulvoice",
+      "path": "/home/yoshiaki/work/heartfulvoice",
+      "enabled": true,
+      "description": "Excel分析・食数管理システム",
+      "type": "python",
+      "commands": {
+        "startup": "pwd && ls -la",
+        "dev": null
+      }
+    },
+    {
+      "name": "test_project",
+      "path": "/home/yoshiaki/work/test_project",
+      "enabled": false,
+      "description": "テスト用プロジェクト",
+      "type": "test",
+      "commands": {
+        "startup": "pwd && ls -la",
+        "dev": null
+      }
+    },
+    {
+      "name": "tmux-master",
+      "path": "/home/yoshiaki/work/tmux-master",
+      "enabled": false,
+      "description": "tmux学習・ソースコード研究",
+      "type": "research",
+      "commands": {
+        "startup": "pwd && ls -la",
+        "dev": null
+      }
+    },
+    {
+      "name": "tomica-vault",
+      "path": "/home/yoshiaki/work/tomica-vault",
+      "enabled": true,
+      "description": "トミカコレクション管理アプリ",
+      "type": "react-native",
+      "commands": {
+        "startup": "pwd && ls -la package.json",
+        "dev": "cd tomica-vault-app && npm start"
+      }
+    },
+    {
+      "name": "zaseki",
+      "path": "/home/yoshiaki/work/zaseki",
+      "enabled": true,
+      "description": "座席配置・QRコード管理システム",
+      "type": "nextjs",
+      "commands": {
+        "startup": "pwd && ls -la",
+        "dev": "cd zaseki-app && npm run dev"
+      }
+    },
+    {
+      "name": "ずんだもん",
+      "path": "/home/yoshiaki/work/ずんだもん",
+      "enabled": true,
+      "description": "自動検出されたプロジェクト (shell)",
+      "type": "shell",
+      "commands": {
+        "startup": "pwd && ls -la",
+        "dev": null
+      }
+    }
+  ],
+  "settings": {
+    "default_layout": "even-vertical",
+    "auto_attach": false,
+    "kill_existing": false,
+    "create_dev_pane": true,
+    "dev_pane_size": "30%"
+  }
+}
