@@ -467,6 +467,62 @@ main() {
     local session_count=0
     local skipped_count=0
     
+    # 親ディレクトリ（workディレクトリ）のセッション作成（最初に実行）
+    local enable_parent_dir=$(jq -r '.settings.enable_parent_directory' "$CONFIG_FILE")
+    if [[ "$enable_parent_dir" == "true" ]]; then
+        local parent_session_name="work-dir"
+        if [[ -z "$specific_project" ]]; then
+            # 既存セッションの処理
+            if session_exists "$parent_session_name"; then
+                if [[ "$kill_existing" == "true" ]]; then
+                    if [[ "$dry_run" != "true" ]]; then
+                        echo -e "${YELLOW}既存セッション削除:${NC} $parent_session_name"
+                        tmux kill-session -t "$parent_session_name"
+                    else
+                        echo -e "${BLUE}[DRY-RUN]${NC} 既存セッション削除: $parent_session_name"
+                    fi
+                else
+                    echo -e "${YELLOW}スキップ:${NC} $parent_session_name (セッション既存)"
+                    skipped_count=$((skipped_count + 1))
+                fi
+            fi
+            
+            # 新規セッション作成
+            if [[ "$kill_existing" == "true" ]] || ! session_exists "$parent_session_name"; then
+                create_session "$parent_session_name" "$WORK_DIR" "pwd && ls -la" "null" "$dry_run"
+                session_count=$((session_count + 1))
+            fi
+        fi
+    fi
+    
+    # スクリプト格納ディレクトリのセッション作成（2番目に実行）
+    local enable_script_dir=$(jq -r '.settings.enable_script_directory' "$CONFIG_FILE")
+    if [[ "$enable_script_dir" == "true" ]]; then
+        local script_session_name="script-dir"
+        if [[ -z "$specific_project" ]]; then
+            # 既存セッションの処理
+            if session_exists "$script_session_name"; then
+                if [[ "$kill_existing" == "true" ]]; then
+                    if [[ "$dry_run" != "true" ]]; then
+                        echo -e "${YELLOW}既存セッション削除:${NC} $script_session_name"
+                        tmux kill-session -t "$script_session_name"
+                    else
+                        echo -e "${BLUE}[DRY-RUN]${NC} 既存セッション削除: $script_session_name"
+                    fi
+                else
+                    echo -e "${YELLOW}スキップ:${NC} $script_session_name (セッション既存)"
+                    skipped_count=$((skipped_count + 1))
+                fi
+            fi
+            
+            # 新規セッション作成
+            if [[ "$kill_existing" == "true" ]] || ! session_exists "$script_session_name"; then
+                create_session "$script_session_name" "$SCRIPT_DIR" "pwd && ls -la" "null" "$dry_run"
+                session_count=$((session_count + 1))
+            fi
+        fi
+    fi
+    
     # プロジェクト配列を取得して配列に格納
     local projects_array=()
     while IFS= read -r line; do

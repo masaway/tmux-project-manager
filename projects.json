@@ -94,6 +94,8 @@
     "auto_attach": false,
     "kill_existing": false,
     "create_dev_pane": true,
-    "dev_pane_size": "30%"
+    "dev_pane_size": "30%",
+    "enable_parent_directory": true,
+    "enable_script_directory": true
   }
 }
