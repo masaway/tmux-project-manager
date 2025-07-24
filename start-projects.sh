@@ -7,7 +7,17 @@ set -e
 
 # 設定ファイルのパス
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="${SCRIPT_DIR}/projects.json"
+CONFIG_DIR="${SCRIPT_DIR}/config"
+DEFAULT_CONFIG="${CONFIG_DIR}/default.json"
+PERSONAL_CONFIG="${CONFIG_DIR}/personal.json"
+
+# 個人設定が存在すれば優先、なければデフォルト使用
+if [[ -f "$PERSONAL_CONFIG" ]]; then
+    CONFIG_FILE="$PERSONAL_CONFIG"
+else
+    CONFIG_FILE="$DEFAULT_CONFIG"
+fi
+
 WORK_DIR="$(dirname "$SCRIPT_DIR")"
 
 # 色の定義
@@ -228,7 +238,7 @@ add_new_projects() {
     for project in "${projects[@]}"; do
         local full_path="$WORK_DIR/$project"
         local project_type=$(detect_project_type "$full_path")
-        local startup_cmd="pwd && ls -la"
+        local startup_cmd="null"
         local dev_cmd="null"
         
         # プロジェクトタイプに応じた開発コマンドを設定
@@ -379,6 +389,16 @@ create_session() {
                     if ! tmux send-keys -t "$name:0.1" "$dev_cmd" 2>/dev/null; then
                         echo -e "${YELLOW}警告: 開発コマンド送信に失敗 ($name)${NC}"
                     fi
+                    
+                    # 下段ペインでclaudeを自動実行する設定をチェック
+                    local enable_claude=$(jq -r '.settings.enable_claude_in_bottom_pane' "$CONFIG_FILE")
+                    if [[ "$enable_claude" == "true" ]]; then
+                        # 下段ペイン（0.2）でclaudeを実行
+                        if ! tmux send-keys -t "$name:0.2" "claude" Enter 2>/dev/null; then
+                            echo -e "${YELLOW}警告: claude実行に失敗 ($name)${NC}"
+                        fi
+                    fi
+                    
                     # メインペイン（左上）を選択
                     tmux select-pane -t "$name:0.0" 2>/dev/null
                 else
@@ -392,6 +412,16 @@ create_session() {
         # 開発コマンドがない場合は通常の上下2分割
         tmux split-window -t "$name" -v -c "$path" 2>/dev/null
         sleep 0.1
+        
+        # 下段ペインでclaudeを自動実行する設定をチェック
+        local enable_claude=$(jq -r '.settings.enable_claude_in_bottom_pane' "$CONFIG_FILE")
+        if [[ "$enable_claude" == "true" ]]; then
+            # 下段ペイン（0.1）でclaudeを実行
+            if ! tmux send-keys -t "$name:0.1" "claude" Enter 2>/dev/null; then
+                echo -e "${YELLOW}警告: claude実行に失敗 ($name)${NC}"
+            fi
+        fi
+        
         tmux select-pane -t "$name:0.0" 2>/dev/null
     fi
     
@@ -489,7 +519,7 @@ main() {
             
             # 新規セッション作成
             if [[ "$kill_existing" == "true" ]] || ! session_exists "$parent_session_name"; then
-                create_session "$parent_session_name" "$WORK_DIR" "pwd && ls -la" "null" "$dry_run"
+                create_session "$parent_session_name" "$WORK_DIR" "null" "null" "$dry_run"
                 session_count=$((session_count + 1))
             fi
         fi
@@ -517,7 +547,7 @@ main() {
             
             # 新規セッション作成
             if [[ "$kill_existing" == "true" ]] || ! session_exists "$script_session_name"; then
-                create_session "$script_session_name" "$SCRIPT_DIR" "pwd && ls -la" "null" "$dry_run"
+                create_session "$script_session_name" "$SCRIPT_DIR" "null" "null" "$dry_run"
                 session_count=$((session_count + 1))
             fi
         fi

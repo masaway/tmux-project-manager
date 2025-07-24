@@ -1,0 +1,13 @@
+{
+  "projects": [],
+  "settings": {
+    "default_layout": "even-vertical",
+    "auto_attach": false,
+    "kill_existing": false,
+    "create_dev_pane": true,
+    "dev_pane_size": "30%",
+    "enable_parent_directory": true,
+    "enable_script_directory": true,
+    "enable_claude_in_bottom_pane": true
+  }
+}
