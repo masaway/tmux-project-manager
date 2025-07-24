@@ -1,6 +1,6 @@
 # tmux Project Manager
 
-workディレクトリ配下のプロジェクトをtmuxセッションで一括管理するBashスクリプトツールです。
+指定したディレクトリ配下のプロジェクトをtmuxセッションで一括管理するBashスクリプトツールです。
 
 ## 主なメリット
 
@@ -32,8 +32,15 @@ workディレクトリ配下のプロジェクトをtmuxセッションで一括
 ./start-projects.sh --dry-run
 ```
 
-## 依存関係
+## 初回セットアップ
 
+### 1. リポジトリのクローン
+```bash
+git clone https://github.com/masaway/tmux-project-manager.git
+cd tmux-project-manager
+```
+
+### 2. 依存関係のインストール
 - `tmux` - セッション管理
 - `jq` - JSON解析
 
@@ -45,11 +52,70 @@ sudo apt install tmux jq
 brew install tmux jq
 ```
 
-## 詳細ドキュメント
+### 3. 個人設定ファイルの作成
+```bash
+# personal.json を作成（個人のプロジェクト設定用）
+cp config/default.json config/personal.json
+```
 
-- [設定ファイル](docs/configuration.md) - projects.jsonの設定方法
-- [プロジェクトタイプ](docs/project-types.md) - 自動判定される項目と設定
-- [レイアウト](docs/layouts.md) - tmuxペインレイアウトの詳細
-- [トラブルシューティング](docs/troubleshooting.md) - よくある問題と解決方法
-- [セッション管理](docs/session-management.md) - セッションの管理方法
-- [バックアップ・復元](docs/backup-restore.md) - 設定のバックアップ機能
+### 4. プロジェクト設定のカスタマイズ
+```bash
+# 設定ファイルを編集
+./start-projects.sh --config
+# または直接編集
+vim config/personal.json
+```
+
+## 設定ファイルについて
+
+このツールは2つの設定ファイルを使用します：
+
+- **`config/default.json`** - デフォルト設定（パブリック、空のプロジェクト配列）
+- **`config/personal.json`** - 個人設定（あなた専用、`.gitignore`対象）
+
+### 設定読み込み優先順位
+1. `config/personal.json` が存在する場合 → 個人設定を使用
+2. 存在しない場合 → `config/default.json` を使用
+
+### スキャン対象ディレクトリの設定
+
+デフォルトでは、スクリプトの親ディレクトリをスキャンしますが、任意のディレクトリを指定可能です：
+
+```json
+{
+  "projects": [...],
+  "settings": {
+    "scan_directory": "/home/username/projects",
+    "default_layout": "even-vertical",
+    ...
+  }
+}
+```
+
+### プロジェクト追加方法
+```bash
+# 自動検出でプロジェクトを追加
+./start-projects.sh --scan
+
+# 手動で config/personal.json を編集
+{
+  "projects": [
+    {
+      "name": "my-project",
+      "path": "/path/to/your/project",
+      "enabled": true,
+      "description": "プロジェクトの説明",
+      "type": "nextjs",
+      "commands": {
+        "startup": "pwd && ls -la",
+        "dev": "npm run dev"
+      }
+    }
+  ],
+  "settings": {
+    "scan_directory": "/home/username/projects",
+    ...
+  }
+}
+```
+

@@ -1,6 +1,7 @@
 {
   "projects": [],
   "settings": {
+    "scan_directory": "",
     "default_layout": "even-vertical",
     "auto_attach": false,
     "kill_existing": false,

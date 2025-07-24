@@ -18,7 +18,13 @@ else
     CONFIG_FILE="$DEFAULT_CONFIG"
 fi
 
-WORK_DIR="$(dirname "$SCRIPT_DIR")"
+# scan_directoryの設定を読み込み、未設定なら親ディレクトリを使用
+SCAN_DIR=$(jq -r '.settings.scan_directory' "$CONFIG_FILE" 2>/dev/null)
+if [[ -z "$SCAN_DIR" || "$SCAN_DIR" == "null" || "$SCAN_DIR" == "" ]]; then
+    WORK_DIR="$(dirname "$SCRIPT_DIR")"
+else
+    WORK_DIR="$SCAN_DIR"
+fi
 
 # 色の定義
 RED='\033[0;31m'
