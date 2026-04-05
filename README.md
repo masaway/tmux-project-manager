@@ -63,6 +63,9 @@
 # 特定のプロジェクトのみ起動
 ./start-projects.sh --project project-name
 
+# 起動後にセッションへアタッチ/切り替え
+./start-projects.sh --attach
+
 # 設定ファイルを編集
 ./start-projects.sh --config
 
@@ -90,11 +93,21 @@ sudo apt install tmux jq
 brew install tmux jq
 ```
 
-### 3. 個人設定ファイルの作成
+### 3. 個人設定ファイルの初期化
 ```bash
-# personal.json を作成（個人のプロジェクト設定用）
-cp config/default.json config/personal.json
+# 対話ウィザードで personal.json を生成（推奨）
+./start-projects.sh --init
 ```
+
+ウィザードでは以下を設定できます：
+- スキャン対象ディレクトリ
+- workディレクトリ / スクリプトディレクトリのセッション作成
+- 開発用ペインの分割設定
+- 下段ペインでの `claude` 自動起動
+
+完了後そのまま `--scan` でプロジェクトを自動検出するか選択できます。
+
+> 手動で作成する場合: `cp config/default.json config/personal.json`
 
 ### 4. プロジェクト設定のカスタマイズ
 ```bash
@@ -103,6 +116,22 @@ cp config/default.json config/personal.json
 # または直接編集
 vim config/personal.json
 ```
+
+## tmux内からの利用
+
+tmuxセッションに入った状態でも、バックグラウンドで新しいセッションを起動できます。
+
+```bash
+# セッションを作成し、切り替え先を選択するメニューを表示
+./start-projects.sh --attach
+
+# 特定プロジェクトを起動して即切り替え
+./start-projects.sh --project my-app --attach
+```
+
+- **tmux内から実行**: `switch-client` で現在のウィンドウを維持しつつ切り替え
+- **tmux外から実行**: 通常の `attach-session`
+- `--attach` なしで1セッションのみ作成した場合（tmux外）は自動アタッチ
 
 ## 設定ファイルについて
 
