@@ -42,12 +42,14 @@ show_help() {
     echo ""
     echo "オプション:"
     echo "  -h, --help      このヘルプを表示"
+    echo "  -i, --init      personal.json を対話的に初期化"
     echo "  -l, --list      プロジェクト一覧を表示"
     echo "  -c, --config    設定ファイルを編集"
     echo "  -s, --scan      workディレクトリを調査し、新規/削除されたプロジェクトを検出"
     echo "  -k, --kill      既存セッションを削除してから起動"
     echo "  -d, --dry-run   実行せずに実行予定のコマンドを表示"
     echo "  -p, --project   特定のプロジェクトのみ起動 (例: -p tmux-config)"
+    echo "  -a, --attach    起動後にセッションへアタッチ/切り替え（tmux内では switch-client）"
     echo ""
     echo "設定ファイル: ${CONFIG_FILE}"
 }
@@ -59,6 +61,100 @@ check_jq() {
         echo "Ubuntu/Debian: sudo apt install jq"
         echo "macOS: brew install jq"
         exit 1
+    fi
+}
+
+# tmuxの存在確認
+check_tmux() {
+    if ! command -v tmux &> /dev/null; then
+        echo -e "${RED}エラー: tmuxがインストールされていません${NC}"
+        echo "Ubuntu/Debian: sudo apt install tmux"
+        echo "macOS: brew install tmux"
+        exit 1
+    fi
+}
+
+# personal.json の対話的初期化
+init_config() {
+    echo -e "${BLUE}=== personal.json 初期化 ===${NC}"
+    echo ""
+
+    if [[ -f "$PERSONAL_CONFIG" ]]; then
+        echo -e "${YELLOW}personal.json は既に存在します: $PERSONAL_CONFIG${NC}"
+        echo -n "上書きしますか？ (y/N): "
+        read -r response
+        if [[ ! "$response" =~ ^[Yy]$ ]]; then
+            echo "キャンセルしました"
+            exit 0
+        fi
+        echo ""
+    fi
+
+    # --- スキャンディレクトリ ---
+    local default_scan="$(dirname "$SCRIPT_DIR")"
+    echo -e "${YELLOW}プロジェクトをスキャンするディレクトリ${NC}"
+    echo -n "  [${default_scan}]: "
+    read -r scan_dir
+    scan_dir="${scan_dir:-$default_scan}"
+
+    # --- 基本設定 ---
+    echo ""
+    echo -e "${YELLOW}workディレクトリのセッションを作成しますか？${NC}"
+    echo -n "  (Y/n): "
+    read -r ans_parent
+    local enable_parent="true"
+    [[ "$ans_parent" =~ ^[Nn]$ ]] && enable_parent="false"
+
+    echo ""
+    echo -e "${YELLOW}このスクリプトディレクトリのセッションを作成しますか？${NC}"
+    echo -n "  (Y/n): "
+    read -r ans_script
+    local enable_script="true"
+    [[ "$ans_script" =~ ^[Nn]$ ]] && enable_script="false"
+
+    echo ""
+    echo -e "${YELLOW}開発用ペインを横に分割して作成しますか？${NC}"
+    echo -n "  (Y/n): "
+    read -r ans_devpane
+    local create_dev_pane="true"
+    [[ "$ans_devpane" =~ ^[Nn]$ ]] && create_dev_pane="false"
+
+    echo ""
+    echo -e "${YELLOW}下段ペインで claude を自動起動しますか？${NC}"
+    echo -n "  (y/N): "
+    read -r ans_claude
+    local enable_claude="false"
+    [[ "$ans_claude" =~ ^[Yy]$ ]] && enable_claude="true"
+
+    # --- 書き出し ---
+    mkdir -p "$CONFIG_DIR"
+    cat > "$PERSONAL_CONFIG" <<EOF
+{
+  "projects": [],
+  "settings": {
+    "scan_directory": "$scan_dir",
+    "default_layout": "even-vertical",
+    "auto_attach": false,
+    "kill_existing": false,
+    "create_dev_pane": $create_dev_pane,
+    "dev_pane_size": "30%",
+    "enable_parent_directory": $enable_parent,
+    "enable_script_directory": $enable_script,
+    "enable_claude_in_bottom_pane": $enable_claude
+  }
+}
+EOF
+
+    echo ""
+    echo -e "${GREEN}作成しました: $PERSONAL_CONFIG${NC}"
+    echo ""
+    echo -n "--scan でプロジェクトを検出しますか？ (Y/n): "
+    read -r ans_scan
+    if [[ ! "$ans_scan" =~ ^[Nn]$ ]]; then
+        CONFIG_FILE="$PERSONAL_CONFIG"
+        # scan_dir を WORK_DIR に反映
+        WORK_DIR="$scan_dir"
+        scan_directories
     fi
 }
 
@@ -443,17 +539,63 @@ create_session() {
     fi
 }
 
+# セッション作成後にアタッチ or switch-client する
+attach_or_switch() {
+    local session_name="$1"
+    if [[ -n "$TMUX" ]]; then
+        # tmux 内にいる場合は switch-client
+        tmux switch-client -t "$session_name"
+    else
+        tmux attach-session -t "$session_name"
+    fi
+}
+
+# 起動済みセッション一覧から選択してアタッチ/切り替え
+select_and_attach() {
+    local created_sessions=("$@")
+    if [[ ${#created_sessions[@]} -eq 0 ]]; then
+        return
+    fi
+
+    echo ""
+    if [[ -n "$TMUX" ]]; then
+        echo -e "${BLUE}セッションに切り替えますか？${NC}"
+    else
+        echo -e "${BLUE}セッションにアタッチしますか？${NC}"
+    fi
+
+    local i=1
+    for s in "${created_sessions[@]}"; do
+        echo "  $i) $s"
+        i=$((i + 1))
+    done
+    echo "  0) スキップ"
+    echo -n "番号を選択: "
+    read -r choice
+
+    if [[ "$choice" =~ ^[1-9][0-9]*$ ]] && [[ "$choice" -le "${#created_sessions[@]}" ]]; then
+        local target="${created_sessions[$((choice - 1))]}"
+        attach_or_switch "$target"
+    fi
+}
+
 # メイン処理
 main() {
     local kill_existing=false
     local dry_run=false
     local specific_project=""
-    
+    local do_attach=false
+
     # オプション解析
     while [[ $# -gt 0 ]]; do
         case $1 in
             -h|--help)
                 show_help
+                exit 0
+                ;;
+            -i|--init)
+                check_jq
+                init_config
                 exit 0
                 ;;
             -l|--list)
@@ -485,6 +627,10 @@ main() {
                 specific_project="$2"
                 shift 2
                 ;;
+            -a|--attach)
+                do_attach=true
+                shift
+                ;;
             *)
                 echo -e "${RED}エラー: 不明なオプション $1${NC}"
                 show_help
@@ -494,15 +640,17 @@ main() {
     done
     
     check_jq
+    check_tmux
     check_config
-    
+
     echo -e "${BLUE}=== プロジェクトセッション起動 ===${NC}"
     echo "設定ファイル: $CONFIG_FILE"
     echo ""
     
     local session_count=0
     local skipped_count=0
-    
+    local created_sessions=()
+
     # 親ディレクトリ（workディレクトリ）のセッション作成（最初に実行）
     local enable_parent_dir=$(jq -r '.settings.enable_parent_directory' "$CONFIG_FILE")
     if [[ "$enable_parent_dir" == "true" ]]; then
@@ -527,10 +675,11 @@ main() {
             if [[ "$kill_existing" == "true" ]] || ! session_exists "$parent_session_name"; then
                 create_session "$parent_session_name" "$WORK_DIR" "null" "null" "$dry_run"
                 session_count=$((session_count + 1))
+                [[ "$dry_run" != "true" ]] && created_sessions+=("$parent_session_name")
             fi
         fi
     fi
-    
+
     # スクリプト格納ディレクトリのセッション作成（2番目に実行）
     local enable_script_dir=$(jq -r '.settings.enable_script_directory' "$CONFIG_FILE")
     if [[ "$enable_script_dir" == "true" ]]; then
@@ -555,6 +704,7 @@ main() {
             if [[ "$kill_existing" == "true" ]] || ! session_exists "$script_session_name"; then
                 create_session "$script_session_name" "$SCRIPT_DIR" "null" "null" "$dry_run"
                 session_count=$((session_count + 1))
+                [[ "$dry_run" != "true" ]] && created_sessions+=("$script_session_name")
             fi
         fi
     fi
@@ -610,16 +760,25 @@ main() {
         # セッション作成
         create_session "$name" "$path" "$startup_cmd" "$dev_cmd" "$dry_run"
         session_count=$((session_count + 1))
-        
+        [[ "$dry_run" != "true" ]] && created_sessions+=("$name")
+
     done
-    
+
     echo ""
     echo -e "${GREEN}完了!${NC} ${session_count}個のセッションを処理、${skipped_count}個をスキップ"
-    
+
     if [[ "$dry_run" != "true" && "$session_count" -gt 0 ]]; then
         echo ""
         echo -e "${BLUE}セッション一覧:${NC}"
         tmux list-sessions
+
+        # --attach フラグがあれば選択メニュー、なくてもtmux外なら自動アタッチ
+        if [[ "$do_attach" == "true" ]]; then
+            select_and_attach "${created_sessions[@]}"
+        elif [[ -z "$TMUX" && ${#created_sessions[@]} -eq 1 ]]; then
+            # tmux外で1セッションだけ作った場合は自動アタッチ
+            attach_or_switch "${created_sessions[0]}"
+        fi
     fi
 }
 
